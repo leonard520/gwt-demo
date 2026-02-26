@@ -1,0 +1,377 @@
+openapi: "3.0.3"
+info:
+  title: GWT Demo - Rewritten REST API
+  description: |
+    REST API replacing GWT-RPC for the gwt-demo application.
+    Maps all operations from UserService and ItemService GWT-RPC interfaces
+    to RESTful HTTP endpoints with JSON payloads.
+  version: "1.0.0"
+  contact:
+    name: GWT-to-React+SpringBoot Rewrite
+
+servers:
+  - url: http://localhost:8080
+    description: Spring Boot backend (development)
+
+tags:
+  - name: Authentication
+    description: |
+      Replaces UserService GWT-RPC interface (login.rpc).
+      Source: com.example.client.service.UserService
+  - name: Items
+    description: |
+      Replaces ItemService GWT-RPC interface (item.rpc).
+      Source: com.example.client.service.ItemService
+      All endpoints require authentication.
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: User Login
+      description: |
+        Authenticates a user with username and password.
+        Source: UserService.login(User user) → String sessionId
+        Requirements: REQ-001, REQ-021
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: "davis"
+              password: "davis"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                token: "ABC123-SESSION-ID"
+                user:
+                  username: "davis"
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_credentials:
+                  summary: Wrong password
+                  value:
+                    timestamp: "2025-01-30T10:00:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "The email or password you entered is incorrect."
+                    path: "/api/auth/login"
+                user_not_found:
+                  summary: User not found
+                  value:
+                    timestamp: "2025-01-30T10:00:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Sorry, we couldn't locate you in our records."
+                    path: "/api/auth/login"
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: User Logout
+      description: |
+        Invalidates the current session.
+        Source: UserService.logout(String sessionId)
+        Requirements: REQ-002, REQ-021
+      operationId: logout
+      security:
+        - sessionAuth: []
+      responses:
+        '204':
+          description: Logout successful (no content)
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get Current User (Session Recovery)
+      description: |
+        Returns the currently authenticated user.
+        Used for session recovery on page load.
+        Source: UserService.isLoggedIn(String sessionId) → User
+        Requirements: REQ-003, REQ-021
+      operationId: getCurrentUser
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Session valid, returns user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                username: "davis"
+        '401':
+          description: Session invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: "2025-01-30T10:00:00Z"
+                status: 401
+                error: "Unauthorized"
+                message: "The session has timed out. You will need to login again."
+                path: "/api/auth/me"
+
+  /api/items:
+    get:
+      tags: [Items]
+      summary: List All Items
+      description: |
+        Returns all items from the repository.
+        Source: ItemService.findAll(String sessionId) → ArrayList<Item>
+        Requirements: REQ-006, REQ-022
+      operationId: findAllItems
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of all items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+        '401':
+          description: Not authenticated / session expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Items]
+      summary: Create Item
+      description: |
+        Creates a new item. Server assigns the ID.
+        Source: ItemService.create(String sessionId, Item item) → void
+        Note: Source returned void; target returns created item with ID.
+        Requirements: REQ-007, REQ-022
+      operationId: createItem
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreateRequest'
+            example:
+              name: "New Item"
+              description: "A new item description"
+              date: "2025-01-30"
+      responses:
+        '201':
+          description: Item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+              example:
+                id: 10
+                name: "New Item"
+                description: "A new item description"
+                date: "2025-01-30"
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Items]
+      summary: Delete Items (Batch)
+      description: |
+        Deletes multiple items by their IDs.
+        Source: ItemService.delete(String sessionId, ArrayList<Item> items) → void
+        Note: Source passed full item objects; target passes only IDs.
+        Requirements: REQ-009, REQ-022
+      operationId: deleteItems
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRequest'
+            example:
+              ids: [1, 3, 5]
+      responses:
+        '204':
+          description: Items deleted successfully (no content)
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/items/{id}:
+    put:
+      tags: [Items]
+      summary: Update Item
+      description: |
+        Updates an existing item by ID. No-op if ID doesn't exist.
+        Source: ItemService.update(String sessionId, Item item) → void
+        Note: Source passed ID in body; target uses URL path parameter.
+        Requirements: REQ-008, REQ-022
+      operationId: updateItem
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Item ID to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreateRequest'
+            example:
+              name: "Updated Item"
+              description: "Updated description"
+              date: "2025-02-01"
+      responses:
+        '200':
+          description: Item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+      description: Session-based authentication via Spring Security
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: User's username
+          example: "davis"
+        password:
+          type: string
+          description: User's password (plaintext, verified against BCrypt hash)
+          example: "davis"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Session token (session ID)
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        username:
+          type: string
+          description: User's username (password NEVER included)
+
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Server-assigned unique ID
+        name:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+          description: ISO-8601 date (YYYY-MM-DD)
+
+    ItemCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+          description: ISO-8601 date (YYYY-MM-DD)
+
+    DeleteRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: Array of item IDs to delete
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO-8601 timestamp
+        status:
+          type: integer
+          description: HTTP status code
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Human-readable error message
+        path:
+          type: string
+          description: Request path that caused the error

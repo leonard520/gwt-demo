@@ -1,7 +1,36 @@
 war/WEB-INF/classes/
 war/WEB-INF/lib/
 war/com.example.Application/
-target
+target/
 .settings/
 .classpath
 .project
+
+# Java / Maven
+*.class
+*.jar
+*.war
+*.ear
+*.log
+.gradle/
+build/
+
+# Spring Boot
+backend/target/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
